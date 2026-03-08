@@ -19,6 +19,7 @@
     --muted:   #9c7b6e;
     --white:   #fffcf8;
     --shadow:  rgba(122,79,58,0.12);
+    --green:   #7dba6a;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -228,6 +229,53 @@
 
   .form-textarea { resize: vertical; min-height: 70px; }
 
+  /* ── Email 驗證區 ── */
+  .verify-section {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px var(--shadow);
+    border: 1px solid rgba(242,196,196,0.3);
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.4s ease;
+  }
+
+  .verify-row {
+    display: flex; gap: 0.5rem; align-items: flex-end;
+  }
+  .verify-row .form-group { flex: 1; }
+
+  .verify-btn {
+    padding: 0.7rem 1rem;
+    background: linear-gradient(135deg, var(--rose), var(--mauve));
+    color: var(--white);
+    border: none;
+    border-radius: 12px;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .verify-btn:hover:not(:disabled) { opacity: 0.85; }
+  .verify-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .verified-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: #eaf7e5; border: 1.5px solid #b8dfa8;
+    border-radius: 100px; padding: 0.5rem 1rem;
+    font-size: 0.85rem; color: var(--green);
+    margin-top: 0.8rem;
+  }
+
+  .info-msg {
+    background: #f0f4ff; border: 1px solid #c0d0f0;
+    border-radius: 12px; padding: 0.8rem 1rem;
+    font-size: 0.82rem; color: #5a6f9a; text-align: center;
+    margin-top: 0.5rem;
+  }
+
   /* ── 送出按鈕 ── */
   .submit-btn {
     width: 100%;
@@ -354,7 +402,34 @@
   <!-- 訂購表單 -->
   <div id="form-section" style="display:none">
     <div class="section-title">📝 填寫訂購資訊</div>
-    <div id="order-form">
+
+    <!-- Email 驗證區 -->
+    <div class="verify-section" id="verify-section">
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <div class="verify-row">
+          <div class="form-group">
+            <input class="form-input" id="f-email" type="email" placeholder="your@email.com" />
+          </div>
+          <button class="verify-btn" id="send-code-btn" onclick="sendCode()">發送驗證碼</button>
+        </div>
+      </div>
+      <div id="code-section" style="display:none; margin-top:0.8rem;">
+        <div class="form-group">
+          <label class="form-label">驗證碼</label>
+          <div class="verify-row">
+            <div class="form-group">
+              <input class="form-input" id="f-code" type="text" placeholder="輸入 6 位數驗證碼" maxlength="6" />
+            </div>
+            <button class="verify-btn" id="verify-btn" onclick="verifyEmail()">驗證</button>
+          </div>
+        </div>
+      </div>
+      <div id="verify-status"></div>
+    </div>
+
+    <!-- 訂購資訊 -->
+    <div id="order-form" style="display:none">
       <div class="form-group">
         <label class="form-label">姓名 *</label>
         <input class="form-input" id="f-name" type="text" placeholder="請輸入您的姓名" required />
@@ -399,7 +474,9 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzBJX1ynEYOiyIM0GBsa2MF
 
 // ── 資料 ─────────────────────────────────────────────
 let products = [];
-let cart     = {};  // { id: qty }
+let cart     = {};
+let emailVerified = false;
+let verifiedEmail = "";
 
 // ── 初始化 ────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -421,14 +498,14 @@ async function loadProducts() {
     renderProducts();
   } catch(e) {
     document.getElementById('products-container').innerHTML =
-      `<div class="error-msg">⚠️ 無法載入商品，請稍後再試</div>`;
+      `<div class="error-msg">無法載入商品，請稍後再試</div>`;
   }
 }
 
 function renderProducts() {
   const container = document.getElementById('products-container');
   if (!products.length) {
-    container.innerHTML = `<div class="loading-wrap">目前暫無商品，請稍後再來 🌸</div>`;
+    container.innerHTML = `<div class="loading-wrap">目前暫無商品，請稍後再來</div>`;
     return;
   }
 
@@ -479,7 +556,6 @@ function updateCart() {
     return;
   }
 
-  // 更新摘要
   document.getElementById('cart-count-badge').textContent = `${items.length} 項商品`;
   itemList.innerHTML = items.map(i => `
     <div class="cart-item">
@@ -498,6 +574,130 @@ function getCartItems() {
     .map(p => ({ ...p, qty: cart[p.id] }));
 }
 
+// ── Email 驗證 ───────────────────────────────────────
+async function sendCode() {
+  const email = document.getElementById('f-email').value.trim();
+  const statusEl = document.getElementById('verify-status');
+  const btn = document.getElementById('send-code-btn');
+
+  if (!email || !email.includes('@')) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">請輸入有效的 Email</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '發送中…';
+  statusEl.innerHTML = '';
+
+  try {
+    // 先檢查會員狀態
+    const checkRes = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'checkMember', email })
+    });
+    const checkData = await checkRes.json();
+
+    if (checkData.blocked) {
+      statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">此 Email 已被停用，請聯繫店家</div>`;
+      btn.disabled = false;
+      btn.textContent = '發送驗證碼';
+      return;
+    }
+
+    if (checkData.hasActiveOrder) {
+      statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">您有未完成的訂單，結單後才能再次訂購</div>`;
+      btn.disabled = false;
+      btn.textContent = '發送驗證碼';
+      return;
+    }
+
+    if (checkData.exists && checkData.verified) {
+      // 已驗證過，直接通過
+      emailVerified = true;
+      verifiedEmail = email;
+      showVerified();
+      return;
+    }
+
+    // 發送驗證碼
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'sendVerifyCode', email })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('code-section').style.display = 'block';
+      statusEl.innerHTML = `<div class="info-msg">驗證碼已寄到 ${email}，請查收信箱（含垃圾郵件）</div>`;
+      // 60 秒冷卻
+      let cd = 60;
+      btn.textContent = `${cd}s`;
+      const timer = setInterval(() => {
+        cd--;
+        btn.textContent = `${cd}s`;
+        if (cd <= 0) {
+          clearInterval(timer);
+          btn.disabled = false;
+          btn.textContent = '重新發送';
+        }
+      }, 1000);
+    } else {
+      statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">${data.error || '發送失敗'}</div>`;
+      btn.disabled = false;
+      btn.textContent = '發送驗證碼';
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">網路錯誤，請稍後再試</div>`;
+    btn.disabled = false;
+    btn.textContent = '發送驗證碼';
+  }
+}
+
+async function verifyEmail() {
+  const email = document.getElementById('f-email').value.trim();
+  const code  = document.getElementById('f-code').value.trim();
+  const statusEl = document.getElementById('verify-status');
+  const btn = document.getElementById('verify-btn');
+
+  if (!code || code.length !== 6) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">請輸入 6 位數驗證碼</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '驗證中…';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'verifyCode', email, code })
+    });
+    const data = await res.json();
+
+    if (data.success && data.verified) {
+      emailVerified = true;
+      verifiedEmail = email;
+      showVerified();
+    } else {
+      statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">${data.error || '驗證失敗'}</div>`;
+      btn.disabled = false;
+      btn.textContent = '驗證';
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">網路錯誤，請稍後再試</div>`;
+    btn.disabled = false;
+    btn.textContent = '驗證';
+  }
+}
+
+function showVerified() {
+  const section = document.getElementById('verify-section');
+  section.innerHTML = `
+    <div class="verified-badge">✅ 已驗證：${verifiedEmail}</div>
+  `;
+  document.getElementById('order-form').style.display = 'flex';
+}
+
 // ── 送出訂單 ──────────────────────────────────────────
 async function submitOrder() {
   const name       = document.getElementById('f-name').value.trim();
@@ -509,9 +709,12 @@ async function submitOrder() {
 
   errorEl.style.display = 'none';
 
-  if (!name)       { showError('請填寫姓名'); return; }
-  if (!phone)      { showError('請填寫電話'); return; }
-  if (!pickupDate) { showError('請選擇取貨日期'); return; }
+  if (!emailVerified) { showError('請先完成 Email 驗證'); return; }
+  if (!name)          { showError('請填寫姓名'); return; }
+  if (name.length < 2){ showError('姓名至少 2 個字'); return; }
+  if (!phone)         { showError('請填寫電話'); return; }
+  if (!/^09\d{8}$/.test(phone.replace(/[-\s]/g, ''))) { showError('請輸入有效的手機號碼（09 開頭）'); return; }
+  if (!pickupDate)    { showError('請選擇取貨日期'); return; }
 
   const items = getCartItems();
   if (!items.length) { showError('購物車是空的喔！'); return; }
@@ -526,8 +729,10 @@ async function submitOrder() {
       method: 'POST',
       body: JSON.stringify({
         action: 'submitOrder',
+        email: verifiedEmail,
         customerName: name,
-        phone, pickupDate, note, items, total
+        phone: phone.replace(/[-\s]/g, ''),
+        pickupDate, note, items, total
       })
     });
     const data = await res.json();
@@ -538,10 +743,12 @@ async function submitOrder() {
       s.classList.add('show');
       document.getElementById('success-order-id').textContent = `訂單編號：${data.orderId}`;
     } else {
-      throw new Error('送出失敗');
+      showError(data.error || '送出失敗');
+      btn.disabled = false;
+      btn.innerHTML = '<span>🎁</span><span>確認送出訂單</span>';
     }
   } catch(e) {
-    showError('送出失敗，請稍後再試 🙏');
+    showError('送出失敗，請稍後再試');
     btn.disabled = false;
     btn.innerHTML = '<span>🎁</span><span>確認送出訂單</span>';
   }
@@ -555,13 +762,43 @@ function showError(msg) {
 
 function resetPage() {
   cart = {};
+  emailVerified = false;
+  verifiedEmail = "";
   document.getElementById('success-screen').classList.remove('show');
   document.getElementById('shop-view').style.display = 'block';
+  document.getElementById('order-form').style.display = 'none';
+  document.getElementById('form-error').style.display = 'none';
+
+  // 重建驗證區
+  const vs = document.getElementById('verify-section');
+  vs.innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Email *</label>
+      <div class="verify-row">
+        <div class="form-group">
+          <input class="form-input" id="f-email" type="email" placeholder="your@email.com" />
+        </div>
+        <button class="verify-btn" id="send-code-btn" onclick="sendCode()">發送驗證碼</button>
+      </div>
+    </div>
+    <div id="code-section" style="display:none; margin-top:0.8rem;">
+      <div class="form-group">
+        <label class="form-label">驗證碼</label>
+        <div class="verify-row">
+          <div class="form-group">
+            <input class="form-input" id="f-code" type="text" placeholder="輸入 6 位數驗證碼" maxlength="6" />
+          </div>
+          <button class="verify-btn" id="verify-btn" onclick="verifyEmail()">驗證</button>
+        </div>
+      </div>
+    </div>
+    <div id="verify-status"></div>
+  `;
+
   document.getElementById('f-name').value = '';
   document.getElementById('f-phone').value = '';
   document.getElementById('f-date').value = '';
   document.getElementById('f-note').value = '';
-  document.getElementById('form-error').style.display = 'none';
   renderProducts();
   updateCart();
   window.scrollTo(0,0);
