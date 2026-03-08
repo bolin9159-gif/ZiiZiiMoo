@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZiiZiiMoo 烘焙訂購</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,400&family=Noto+Serif+TC:wght@300;400;600&display=swap" rel="stylesheet" />
+<style>
+  /* ── 色票 ── */
+  :root {
+    --cream:   #fdf6ee;
+    --warm:    #f5e6d3;
+    --blush:   #f2c4c4;
+    --rose:    #e8a0a0;
+    --mauve:   #c97d7d;
+    --brown:   #7a4f3a;
+    --text:    #4a3428;
+    --muted:   #9c7b6e;
+    --white:   #fffcf8;
+    --shadow:  rgba(122,79,58,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--cream);
+    font-family: 'Noto Serif TC', serif;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 背景紋理 ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(242,196,196,0.3) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(245,230,211,0.4) 0%, transparent 50%),
+      radial-gradient(circle at 60% 10%, rgba(253,246,238,0.5) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 3rem 1.5rem 2rem;
+    background: linear-gradient(180deg, var(--warm) 0%, transparent 100%);
+  }
+
+  .logo-wrap {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  }
+
+  .logo-icon { font-size: 2.8rem; line-height: 1; animation: float 3s ease-in-out infinite; }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+  }
+
+  .logo-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.4rem;
+    font-weight: 500;
+    color: var(--brown);
+    letter-spacing: 0.05em;
+  }
+
+  .logo-sub {
+    font-size: 0.78rem;
+    letter-spacing: 0.25em;
+    color: var(--mauve);
+    text-transform: uppercase;
+  }
+
+  /* ── 裝飾線 ── */
+  .deco-line {
+    display: flex; align-items: center; gap: 1rem;
+    max-width: 260px; margin: 1rem auto 0;
+  }
+  .deco-line span { flex: 1; height: 1px; background: var(--blush); }
+  .deco-line em { font-style: normal; font-size: 0.8rem; color: var(--rose); }
+
+  /* ── 主內容 ── */
+  main { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 1.5rem; }
+
+  /* ── Section 標題 ── */
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.25rem;
+    color: var(--brown);
+    margin-bottom: 1.2rem;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--blush); }
+
+  /* ── 商品卡 ── */
+  .products-grid { display: flex; flex-direction: column; gap: 1rem; }
+
+  .product-card {
+    background: var(--white);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px var(--shadow);
+    border: 1px solid rgba(242,196,196,0.4);
+    display: flex;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .product-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px var(--shadow); }
+
+  .product-img {
+    width: 110px; min-height: 110px;
+    background: var(--warm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3rem;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .product-img img { width: 100%; height: 100%; object-fit: cover; }
+
+  .product-body { padding: 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .product-name { font-weight: 600; font-size: 1rem; }
+  .product-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+  .product-price { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--mauve); margin-top: auto; }
+
+  /* 數量控制 */
+  .qty-control {
+    display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem;
+  }
+  .qty-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1.5px solid var(--blush);
+    background: var(--cream); color: var(--brown);
+    font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    line-height: 1;
+  }
+  .qty-btn:hover { background: var(--blush); }
+  .qty-num { min-width: 24px; text-align: center; font-weight: 600; font-size: 0.95rem; }
+
+  /* ── 購物車摘要 ── */
+  #cart-summary {
+    margin: 1.8rem 0 1rem;
+    background: var(--white);
+    border-radius: 20px;
+    border: 1.5px solid var(--blush);
+    overflow: hidden;
+    box-shadow: 0 4px 16px var(--shadow);
+    display: none;
+    animation: fadeUp 0.4s ease;
+  }
+  #cart-summary.show { display: block; }
+
+  .cart-header {
+    background: linear-gradient(135deg, var(--blush), var(--rose));
+    padding: 0.9rem 1.2rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cart-header span { color: var(--white); font-weight: 600; font-size: 0.95rem; }
+
+  .cart-items { padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .cart-item {
+    display: flex; justify-content: space-between;
+    font-size: 0.88rem; color: var(--text);
+  }
+  .cart-item-name { color: var(--muted); }
+
+  .cart-total {
+    padding: 0.8rem 1.2rem;
+    border-top: 1px dashed var(--blush);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cart-total-label { font-size: 0.85rem; color: var(--muted); }
+  .cart-total-amount {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem; color: var(--mauve);
+  }
+
+  /* ── 訂單表單 ── */
+  #order-form {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px var(--shadow);
+    border: 1px solid rgba(242,196,196,0.3);
+    display: flex; flex-direction: column; gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .form-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: var(--mauve);
+    text-transform: uppercase;
+  }
+
+  .form-input, .form-textarea {
+    background: var(--cream);
+    border: 1.5px solid var(--blush);
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 0.95rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+  .form-input:focus, .form-textarea:focus {
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(232,160,160,0.2);
+  }
+
+  .form-textarea { resize: vertical; min-height: 70px; }
+
+  /* ── 送出按鈕 ── */
+  .submit-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--rose), var(--mauve));
+    color: var(--white);
+    border: none;
+    border-radius: 16px;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(201,125,125,0.35);
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  }
+  .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(201,125,125,0.4); }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* ── 成功畫面 ── */
+  #success-screen {
+    display: none; text-align: center;
+    padding: 3rem 1.5rem;
+    animation: fadeUp 0.5s ease;
+  }
+  #success-screen.show { display: block; }
+  .success-icon { font-size: 4rem; margin-bottom: 1rem; animation: pop 0.4s ease 0.1s both; }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .success-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--brown); margin-bottom: 0.5rem; }
+  .success-msg { font-size: 0.9rem; color: var(--muted); line-height: 1.7; }
+  .order-id-badge {
+    display: inline-block; margin-top: 1.2rem;
+    background: var(--warm); border: 1.5px solid var(--blush);
+    border-radius: 100px; padding: 0.4rem 1.2rem;
+    font-size: 0.82rem; color: var(--mauve); letter-spacing: 0.08em;
+  }
+  .new-order-btn {
+    margin-top: 2rem;
+    padding: 0.75rem 2rem;
+    background: var(--white);
+    border: 1.5px solid var(--blush);
+    border-radius: 100px;
+    color: var(--mauve);
+    font-family: 'Noto Serif TC', serif;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  .new-order-btn:hover { background: var(--warm); }
+
+  /* ── 載入中 ── */
+  .loading-wrap {
+    text-align: center; padding: 3rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--blush);
+    border-top-color: var(--rose);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 錯誤 */
+  .error-msg {
+    background: #fff0f0; border: 1px solid #f9c0c0;
+    border-radius: 12px; padding: 0.8rem 1rem;
+    font-size: 0.85rem; color: #c97d7d; text-align: center;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center; padding: 2rem;
+    font-size: 0.75rem; color: var(--muted);
+    position: relative; z-index: 1;
+  }
+
+  @media (max-width: 360px) {
+    .logo-name { font-size: 2rem; }
+    .product-img { width: 90px; min-height: 90px; font-size: 2.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo-icon">🐄</div>
+    <div class="logo-name">ZiiZiiMoo</div>
+    <div class="logo-sub">Handmade Bakery</div>
+  </div>
+  <div class="deco-line">
+    <span></span><em>✦ 每日手工烘焙 ✦</em><span></span>
+  </div>
+</header>
+
+<main id="shop-view">
+  <!-- 商品區 -->
+  <div class="section-title">🧁 本日商品</div>
+
+  <div id="products-container">
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      正在載入商品中…
+    </div>
+  </div>
+
+  <!-- 購物車摘要 -->
+  <div id="cart-summary">
+    <div class="cart-header">
+      <span>🛒 購物車</span>
+      <span id="cart-count-badge"></span>
+    </div>
+    <div class="cart-items" id="cart-items-list"></div>
+    <div class="cart-total">
+      <span class="cart-total-label">合計</span>
+      <span class="cart-total-amount">$<span id="cart-total-num">0</span></span>
+    </div>
+  </div>
+
+  <!-- 訂購表單 -->
+  <div id="form-section" style="display:none">
+    <div class="section-title">📝 填寫訂購資訊</div>
+    <div id="order-form">
+      <div class="form-group">
+        <label class="form-label">姓名 *</label>
+        <input class="form-input" id="f-name" type="text" placeholder="請輸入您的姓名" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">電話 *</label>
+        <input class="form-input" id="f-phone" type="tel" placeholder="0912-345-678" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">取貨日期 *</label>
+        <input class="form-input" id="f-date" type="date" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">備註</label>
+        <textarea class="form-textarea" id="f-note" placeholder="特殊需求、過敏資訊等…"></textarea>
+      </div>
+      <div id="form-error" class="error-msg" style="display:none"></div>
+      <button class="submit-btn" id="submit-btn" onclick="submitOrder()">
+        <span>🎁</span><span>確認送出訂單</span>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- 成功畫面 -->
+<div id="success-screen">
+  <div class="success-icon">🎉</div>
+  <div class="success-title">訂單已送出！</div>
+  <div class="success-msg">
+    謝謝您的訂購，<br/>我們會盡快與您確認取貨細節 🐄
+  </div>
+  <div class="order-id-badge" id="success-order-id"></div>
+  <br/>
+  <button class="new-order-btn" onclick="resetPage()">再次訂購</button>
+</div>
+
+<footer>ZiiZiiMoo Handmade Bakery ✦ 純手工烘焙，溫暖交給你</footer>
+
+<script>
+// ── 設定你的 Apps Script 網址 ──────────────────────────
+const API_URL = "貼上你的Apps Script網址";  // ← 部署後貼上
+
+// ── 資料 ─────────────────────────────────────────────
+let products = [];
+let cart     = {};  // { id: qty }
+
+// ── 初始化 ────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  setMinDate();
+  loadProducts();
+});
+
+function setMinDate() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('f-date').min = today;
+}
+
+// ── 載入商品 ──────────────────────────────────────────
+async function loadProducts() {
+  try {
+    const res  = await fetch(`${API_URL}?action=getProducts`);
+    const data = await res.json();
+    products = data.products || [];
+    renderProducts();
+  } catch(e) {
+    document.getElementById('products-container').innerHTML =
+      `<div class="error-msg">⚠️ 無法載入商品，請稍後再試</div>`;
+  }
+}
+
+function renderProducts() {
+  const container = document.getElementById('products-container');
+  if (!products.length) {
+    container.innerHTML = `<div class="loading-wrap">目前暫無商品，請稍後再來 🌸</div>`;
+    return;
+  }
+
+  const EMOJI = ["🧁","🍰","🥐","🍞","🎂","🍩","🥧","🍪"];
+
+  container.innerHTML = `<div class="products-grid">${
+    products.map((p, i) => {
+      const emoji = EMOJI[i % EMOJI.length];
+      const imgHtml = p.image_url
+        ? `<img src="${p.image_url}" alt="${p.name}" />`
+        : emoji;
+      return `
+        <div class="product-card" style="animation-delay:${i*0.08}s">
+          <div class="product-img">${imgHtml}</div>
+          <div class="product-body">
+            <div class="product-name">${p.name}</div>
+            <div class="product-desc">${p.description || ''}</div>
+            <div class="product-price">$${p.price}</div>
+            <div class="qty-control">
+              <button class="qty-btn" onclick="changeQty(${p.id}, -1)">−</button>
+              <span class="qty-num" id="qty-${p.id}">0</span>
+              <button class="qty-btn" onclick="changeQty(${p.id}, 1)">＋</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('')
+  }</div>`;
+}
+
+// ── 購物車操作 ────────────────────────────────────────
+function changeQty(id, delta) {
+  cart[id] = Math.max(0, (cart[id] || 0) + delta);
+  document.getElementById(`qty-${id}`).textContent = cart[id];
+  updateCart();
+}
+
+function updateCart() {
+  const items = getCartItems();
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const summary  = document.getElementById('cart-summary');
+  const formSec  = document.getElementById('form-section');
+  const itemList = document.getElementById('cart-items-list');
+
+  if (items.length === 0) {
+    summary.classList.remove('show');
+    formSec.style.display = 'none';
+    return;
+  }
+
+  // 更新摘要
+  document.getElementById('cart-count-badge').textContent = `${items.length} 項商品`;
+  itemList.innerHTML = items.map(i => `
+    <div class="cart-item">
+      <span class="cart-item-name">${i.name} × ${i.qty}</span>
+      <span>$${i.price * i.qty}</span>
+    </div>`).join('');
+  document.getElementById('cart-total-num').textContent = total;
+
+  summary.classList.add('show');
+  formSec.style.display = 'block';
+}
+
+function getCartItems() {
+  return products
+    .filter(p => cart[p.id] > 0)
+    .map(p => ({ ...p, qty: cart[p.id] }));
+}
+
+// ── 送出訂單 ──────────────────────────────────────────
+async function submitOrder() {
+  const name       = document.getElementById('f-name').value.trim();
+  const phone      = document.getElementById('f-phone').value.trim();
+  const pickupDate = document.getElementById('f-date').value;
+  const note       = document.getElementById('f-note').value.trim();
+  const errorEl    = document.getElementById('form-error');
+  const btn        = document.getElementById('submit-btn');
+
+  errorEl.style.display = 'none';
+
+  if (!name)       { showError('請填寫姓名'); return; }
+  if (!phone)      { showError('請填寫電話'); return; }
+  if (!pickupDate) { showError('請選擇取貨日期'); return; }
+
+  const items = getCartItems();
+  if (!items.length) { showError('購物車是空的喔！'); return; }
+
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:20px;height:20px;border-width:2px;margin:0"></span>';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'submitOrder',
+        customerName: name,
+        phone, pickupDate, note, items, total
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('shop-view').style.display = 'none';
+      const s = document.getElementById('success-screen');
+      s.classList.add('show');
+      document.getElementById('success-order-id').textContent = `訂單編號：${data.orderId}`;
+    } else {
+      throw new Error('送出失敗');
+    }
+  } catch(e) {
+    showError('送出失敗，請稍後再試 🙏');
+    btn.disabled = false;
+    btn.innerHTML = '<span>🎁</span><span>確認送出訂單</span>';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('form-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function resetPage() {
+  cart = {};
+  document.getElementById('success-screen').classList.remove('show');
+  document.getElementById('shop-view').style.display = 'block';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-phone').value = '';
+  document.getElementById('f-date').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('form-error').style.display = 'none';
+  renderProducts();
+  updateCart();
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
