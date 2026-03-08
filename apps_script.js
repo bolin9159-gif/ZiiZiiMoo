@@ -25,9 +25,15 @@ function getProducts() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
                               .getSheetByName(SHEET_NAME_PRODUCTS);
   const rows  = sheet.getDataRange().getValues();
-  const headers = rows[0];
-  const products = rows.slice(1)
-    .filter(r => r[headers.indexOf("available")] == true || r[headers.indexOf("available")] === "TRUE")
+  // 自動找到表頭列（任一格 trim 後為 "id" 的那一列）
+  const headerIdx = rows.findIndex(r => r.some(cell => String(cell).trim().toLowerCase() === "id"));
+  if (headerIdx === -1) return jsonResponse({ products: [], debug: "no header found", firstRows: rows.slice(0,4).map(r => r.map(c => String(c).trim())) });
+  const headers = rows[headerIdx].map(h => String(h).trim().toLowerCase());
+  const products = rows.slice(headerIdx + 1)
+    .filter(r => {
+      const avail = String(r[headers.indexOf("available")]).trim().toUpperCase();
+      return avail === "TRUE";
+    })
     .map(r => ({
       id:          r[headers.indexOf("id")],
       name:        r[headers.indexOf("name")],
