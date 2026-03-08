@@ -29,9 +29,10 @@ function getProducts() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
                               .getSheetByName(SHEET_NAME_PRODUCTS);
   const rows  = sheet.getDataRange().getValues();
-  const headerIdx = rows.findIndex(r => r.some(cell => String(cell).trim().toLowerCase() === "id"));
+  const firstLine = c => String(c).split("\n")[0].trim().toLowerCase();
+  const headerIdx = rows.findIndex(r => r.some(cell => firstLine(cell) === "id"));
   if (headerIdx === -1) return jsonResponse({ products: [] });
-  const headers = rows[headerIdx].map(h => String(h).trim().toLowerCase());
+  const headers = rows[headerIdx].map(h => firstLine(h));
   const products = rows.slice(headerIdx + 1)
     .filter(r => {
       const avail = String(r[headers.indexOf("available")]).trim().toUpperCase();
@@ -63,9 +64,11 @@ function getMembersSheet() {
 
 function getMemberHeaders(sheet) {
   const rows = sheet.getDataRange().getValues();
-  const headerIdx = rows.findIndex(r => r.some(cell => String(cell).trim().toLowerCase() === "email"));
+  // 取第一行文字（換行前）做比對，例如 "email\n電子信箱" → "email"
+  const firstLine = c => String(c).split("\n")[0].trim().toLowerCase();
+  const headerIdx = rows.findIndex(r => r.some(cell => firstLine(cell) === "email"));
   if (headerIdx === -1) return { headerIdx: -1, headers: [], rows: [] };
-  const headers = rows[headerIdx].map(h => String(h).trim().toLowerCase());
+  const headers = rows[headerIdx].map(h => firstLine(h));
   return { headerIdx, headers, rows };
 }
 
@@ -102,9 +105,10 @@ function checkActiveOrder(email) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_ORDERS);
   if (!sheet) return false;
   const rows = sheet.getDataRange().getValues();
-  const headerIdx = rows.findIndex(r => r.some(cell => String(cell).trim().toLowerCase() === "order_id"));
+  const firstLine = c => String(c).split("\n")[0].trim().toLowerCase();
+  const headerIdx = rows.findIndex(r => r.some(cell => firstLine(cell) === "order_id"));
   if (headerIdx === -1) return false;
-  const headers = rows[headerIdx].map(h => String(h).trim().toLowerCase());
+  const headers = rows[headerIdx].map(h => firstLine(h));
   const emailCol = headers.indexOf("email");
   const statusCol = headers.indexOf("order_status");
   if (emailCol === -1 || statusCol === -1) return false;
