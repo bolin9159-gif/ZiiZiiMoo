@@ -574,14 +574,24 @@ function getCartItems() {
     .map(p => ({ ...p, qty: cart[p.id] }));
 }
 
+// ── Email 格式驗證 ────────────────────────────────────
+function isValidEmail(email) {
+  // 標準 Email 格式：xxx@xxx.xx
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
 // ── Email 驗證 ───────────────────────────────────────
 async function sendCode() {
   const email = document.getElementById('f-email').value.trim();
   const statusEl = document.getElementById('verify-status');
   const btn = document.getElementById('send-code-btn');
 
-  if (!email || !email.includes('@')) {
-    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">請輸入有效的 Email</div>`;
+  if (!email) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">請輸入 Email</div>`;
+    return;
+  }
+  if (!isValidEmail(email)) {
+    statusEl.innerHTML = `<div class="error-msg" style="margin-top:0.5rem">Email 格式不正確，請確認格式（例如：name@example.com）</div>`;
     return;
   }
 

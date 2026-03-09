@@ -131,7 +131,7 @@ function sendVerifyCode(data) {
   const phone = String(data.phone || "").trim();
 
   if (!email) return jsonResponse({ error: "請輸入 Email" });
-  if (!email.includes("@")) return jsonResponse({ error: "Email 格式不正確" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return jsonResponse({ error: "Email 格式不正確，請確認格式（例如：name@example.com）" });
 
   const sheet = getMembersSheet();
   const { headerIdx, headers, rows } = getMemberHeaders(sheet);
@@ -166,6 +166,7 @@ function sendVerifyCode(data) {
     "inactive",
     Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy/MM/dd HH:mm:ss")
   ]);
+  styleNewRow(sheet, SHEET_NAME_MEMBERS);
   sendCodeEmail(email, code);
   return jsonResponse({ success: true, message: "驗證碼已寄出" });
 }
@@ -203,6 +204,9 @@ function verifyCode(data) {
       const statusCol = headers.indexOf("status");
       if (statusCol !== -1) sheet.getRange(i + 1, statusCol + 1).setValue("active");
       sheet.getRange(i + 1, codeCol + 1).setValue(""); // 清除驗證碼
+      // 更新該列樣式（verified → 綠色, status → 綠色）
+      applyStatusStyle(sheet, i + 1, verifiedCol + 1, "true");
+      if (statusCol !== -1) applyMemberStatusStyle(sheet, i + 1, statusCol + 1, "active");
       return jsonResponse({ success: true, verified: true });
     }
   }
@@ -282,6 +286,7 @@ function submitOrder(data) {
     0,         // balance (尾款)
     ""         // payment_note
   ]);
+  styleNewRow(sheet, SHEET_NAME_ORDERS);
 
   // 寄通知信給店主
   sendNotificationEmail(orderId, data, itemsText, timestamp);
@@ -324,4 +329,288 @@ function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ══════════════════════════════════════════════════════
+// ── 統一樣式系統（完全依據現有 Sheet 設計）──────────────
+// ══════════════════════════════════════════════════════
+
+// ── 色票定義（從現有 Sheet 擷取）─────────────────────
+const COLORS = {
+  // 共用
+  white:     "#FFFCF8",
+  cream:     "#FDF6EE",
+  warm:      "#F5E6D3",
+  brown:     "#7A4F3A",
+  text:      "#4A3428",
+  mauve:     "#C97D7D",
+  muted:     "#9C7B6E",
+
+  // 狀態色
+  greenBg:   "#D6F0D3",  greenText:   "#3A7A4F",  // TRUE, active
+  redBg:     "#FAD4D4",  redText:     "#7A3A3A",  // FALSE, blocked
+  yellowBg:  "#FFF8E1",  yellowText:  "#856404",  // inactive, 待確認
+  blueBg:    "#E3F2FD",  blueText:    "#1565C0",  // 已收訂金
+  tealBg:    "#EAF4F2",  tealText:    "#4A8A7A",  // Orders 說明列
+
+  // Products 專用
+  prodHeader:    "#C97D7D",
+
+  // Orders 專用
+  orderHeader:   "#E8A0A0",
+  orderPayHeader:"#4A8A7A",
+  orderNoteBg:   "#EAF4F2",
+
+  // Members 專用
+  memberTitle:   "#4A6FA5",
+  memberHeader:  "#4A6FA5",
+  memberNoteBg:  "#EAF0FB"
+};
+
+// ── 開啟試算表時加入自訂選單 ─────────────────────────
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("ZiiZiiMoo")
+    .addItem("格式化所有分頁", "formatAllSheets")
+    .addItem("格式化目前分頁", "formatCurrentSheet")
+    .addToUi();
+}
+
+// ── 格式化所有分頁 ──────────────────────────────────
+function formatAllSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  [SHEET_NAME_PRODUCTS, SHEET_NAME_ORDERS, SHEET_NAME_MEMBERS].forEach(name => {
+    const sheet = ss.getSheetByName(name);
+    if (sheet) formatSheet(sheet, name);
+  });
+  SpreadsheetApp.getUi().alert("✅ 所有分頁格式化完成！");
+}
+
+// ── 格式化目前分頁 ──────────────────────────────────
+function formatCurrentSheet() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  formatSheet(sheet, sheet.getName());
+  SpreadsheetApp.getUi().alert("✅ " + sheet.getName() + " 格式化完成！");
+}
+
+// ── 格式化單一分頁 ──────────────────────────────────
+function formatSheet(sheet, sheetName) {
+  const lastRow = Math.max(sheet.getLastRow(), 4);
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+
+  // 全頁基礎：Arial、垂直置中
+  const allRange = sheet.getRange(1, 1, lastRow, lastCol);
+  allRange.setFontFamily("Arial");
+  allRange.setVerticalAlignment("middle");
+
+  // ── Row 1：標題列 ──
+  const titleBg = (sheetName === SHEET_NAME_MEMBERS) ? COLORS.memberTitle : COLORS.brown;
+  const r1 = sheet.getRange(1, 1, 1, lastCol);
+  if (lastCol > 1) r1.merge();
+  r1.setBackground(titleBg)
+    .setFontColor(COLORS.white)
+    .setFontSize(14)
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+  sheet.setRowHeight(1, 40);
+
+  // ── Row 2：說明列 ──
+  if (lastRow >= 2) {
+    const r2 = sheet.getRange(2, 1, 1, lastCol);
+    if (lastCol > 1) r2.merge();
+    r2.setBackground(COLORS.warm)
+      .setFontColor(COLORS.mauve)
+      .setFontSize(9)
+      .setFontWeight("normal")
+      .setFontStyle("italic")
+      .setHorizontalAlignment("center");
+    sheet.setRowHeight(2, 25);
+  }
+
+  // ── Row 3：表頭列 ──
+  if (lastRow >= 3) {
+    let headerBg = COLORS.prodHeader;
+    if (sheetName === SHEET_NAME_ORDERS) headerBg = COLORS.orderHeader;
+    if (sheetName === SHEET_NAME_MEMBERS) headerBg = COLORS.memberHeader;
+
+    const r3 = sheet.getRange(3, 1, 1, lastCol);
+    r3.setBackground(headerBg)
+      .setFontColor(COLORS.white)
+      .setFontSize(10)
+      .setFontWeight("bold")
+      .setHorizontalAlignment("center")
+      .setWrap(true);
+    sheet.setRowHeight(3, 45);
+
+    // Orders: J~M 欄（付款區）用青綠色
+    if (sheetName === SHEET_NAME_ORDERS && lastCol >= 10) {
+      const payCols = Math.min(lastCol - 9, 4); // J=10, K=11, L=12, M=13
+      sheet.getRange(3, 10, 1, payCols)
+        .setBackground(COLORS.orderPayHeader);
+    }
+  }
+
+  // ── Row 4：說明列（Orders / Members 才有）──
+  if (lastRow >= 4 && (sheetName === SHEET_NAME_ORDERS || sheetName === SHEET_NAME_MEMBERS)) {
+    const r4 = sheet.getRange(4, 1, 1, lastCol);
+    if (lastCol > 1) r4.merge();
+    const noteBg = (sheetName === SHEET_NAME_ORDERS) ? COLORS.orderNoteBg : COLORS.memberNoteBg;
+    const noteColor = (sheetName === SHEET_NAME_ORDERS) ? COLORS.tealText : COLORS.memberHeader;
+    r4.setBackground(noteBg)
+      .setFontColor(noteColor)
+      .setFontSize(9)
+      .setFontWeight("normal")
+      .setFontStyle("italic")
+      .setHorizontalAlignment("center");
+  }
+
+  // ── Row 4/5+：資料列 ──
+  const dataStartRow = (sheetName === SHEET_NAME_ORDERS || sheetName === SHEET_NAME_MEMBERS) ? 5 : 4;
+  for (let row = dataStartRow; row <= lastRow; row++) {
+    formatDataRow(sheet, sheetName, row, lastCol);
+  }
+
+  // 凍結前 3 列
+  sheet.setFrozenRows(3);
+
+  // 自動調整欄寬（80~250）
+  for (let col = 1; col <= lastCol; col++) {
+    sheet.autoResizeColumn(col);
+    const w = sheet.getColumnWidth(col);
+    if (w < 80) sheet.setColumnWidth(col, 80);
+    if (w > 250) sheet.setColumnWidth(col, 250);
+  }
+}
+
+// ── 格式化單一資料列 ─────────────────────────────────
+function formatDataRow(sheet, sheetName, rowNum, lastCol) {
+  const isAlt = (rowNum % 2 === 0);
+  const baseBg = isAlt ? COLORS.cream : COLORS.white;
+  const rowRange = sheet.getRange(rowNum, 1, 1, lastCol);
+
+  // 基礎樣式
+  rowRange.setBackground(baseBg)
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setFontWeight("normal")
+    .setFontStyle("normal")
+    .setFontColor(COLORS.text)
+    .setVerticalAlignment("middle")
+    .setWrap(true);
+
+  // ── 各分頁的欄位特殊樣式 ──
+
+  if (sheetName === SHEET_NAME_PRODUCTS) {
+    // A 欄（id）：置中、粗體、棕色
+    sheet.getRange(rowNum, 1).setHorizontalAlignment("center").setFontWeight("bold").setFontColor(COLORS.brown);
+    // B 欄（name）：靠左
+    if (lastCol >= 2) sheet.getRange(rowNum, 2).setHorizontalAlignment("left");
+    // C 欄（description）：靠左
+    if (lastCol >= 3) sheet.getRange(rowNum, 3).setHorizontalAlignment("left");
+    // D 欄（price）：靠右、玫瑰色
+    if (lastCol >= 4) sheet.getRange(rowNum, 4).setHorizontalAlignment("right").setFontColor(COLORS.mauve);
+    // F 欄（available）：條件色
+    if (lastCol >= 6) {
+      const val = String(sheet.getRange(rowNum, 6).getValue()).trim().toUpperCase();
+      applyStatusStyle(sheet, rowNum, 6, val === "TRUE" ? "true" : "false");
+    }
+  }
+
+  if (sheetName === SHEET_NAME_ORDERS) {
+    // A 欄（timestamp）：置中、棕色
+    sheet.getRange(rowNum, 1).setHorizontalAlignment("center").setFontColor(COLORS.brown);
+    // B 欄（order_id）：置中、棕色
+    if (lastCol >= 2) sheet.getRange(rowNum, 2).setHorizontalAlignment("center").setFontColor(COLORS.brown);
+    // C~G 欄：靠左
+    for (let c = 3; c <= Math.min(7, lastCol); c++) {
+      sheet.getRange(rowNum, c).setHorizontalAlignment("left");
+    }
+    // H 欄（總金額）：靠右、玫瑰色
+    if (lastCol >= 8) sheet.getRange(rowNum, 8).setHorizontalAlignment("right").setFontColor(COLORS.mauve);
+    // I 欄（備註）：靠左
+    if (lastCol >= 9) sheet.getRange(rowNum, 9).setHorizontalAlignment("left");
+    // J 欄（order_status）：條件色
+    if (lastCol >= 10) {
+      const status = String(sheet.getRange(rowNum, 10).getValue()).trim();
+      applyOrderStatusStyle(sheet, rowNum, 10, status);
+    }
+    // K 欄（deposit）：靠右、棕色
+    if (lastCol >= 11) sheet.getRange(rowNum, 11).setHorizontalAlignment("right").setFontColor(COLORS.brown);
+    // L 欄（balance）：靠右、棕色
+    if (lastCol >= 12) sheet.getRange(rowNum, 12).setHorizontalAlignment("right").setFontColor(COLORS.brown);
+    // M 欄（payment_note）：靠左
+    if (lastCol >= 13) sheet.getRange(rowNum, 13).setHorizontalAlignment("left");
+  }
+
+  if (sheetName === SHEET_NAME_MEMBERS) {
+    // A 欄（email）：置中、棕色
+    sheet.getRange(rowNum, 1).setHorizontalAlignment("center").setFontColor(COLORS.brown);
+    // B 欄（name）：靠左
+    if (lastCol >= 2) sheet.getRange(rowNum, 2).setHorizontalAlignment("left");
+    // C 欄（phone）：靠左
+    if (lastCol >= 3) sheet.getRange(rowNum, 3).setHorizontalAlignment("left");
+    // D 欄（verified）：條件色
+    if (lastCol >= 4) {
+      const val = String(sheet.getRange(rowNum, 4).getValue()).trim().toUpperCase();
+      applyStatusStyle(sheet, rowNum, 4, val === "TRUE" ? "true" : "false");
+    }
+    // E~F 欄：靠左
+    if (lastCol >= 5) sheet.getRange(rowNum, 5).setHorizontalAlignment("left");
+    if (lastCol >= 6) sheet.getRange(rowNum, 6).setHorizontalAlignment("left");
+    // G 欄（status）：條件色
+    if (lastCol >= 7) {
+      const val = String(sheet.getRange(rowNum, 7).getValue()).trim().toLowerCase();
+      applyMemberStatusStyle(sheet, rowNum, 7, val);
+    }
+    // H 欄（registered_at）：置中、棕色
+    if (lastCol >= 8) sheet.getRange(rowNum, 8).setHorizontalAlignment("center").setFontColor(COLORS.brown);
+  }
+}
+
+// ── 狀態樣式：TRUE / FALSE ──────────────────────────
+function applyStatusStyle(sheet, row, col, type) {
+  const cell = sheet.getRange(row, col);
+  cell.setHorizontalAlignment("center").setFontWeight("bold");
+  if (type === "true") {
+    cell.setBackground(COLORS.greenBg).setFontColor(COLORS.greenText);
+  } else {
+    cell.setBackground(COLORS.redBg).setFontColor(COLORS.redText);
+  }
+}
+
+// ── 狀態樣式：訂單狀態 ──────────────────────────────
+function applyOrderStatusStyle(sheet, row, col, status) {
+  const cell = sheet.getRange(row, col);
+  cell.setHorizontalAlignment("center").setFontWeight("bold");
+  if (status === "待確認") {
+    cell.setBackground(COLORS.yellowBg).setFontColor(COLORS.yellowText);
+  } else if (status === "已收訂金") {
+    cell.setBackground(COLORS.blueBg).setFontColor(COLORS.blueText);
+  } else if (status === "已付清") {
+    cell.setBackground("#E8F5E9").setFontColor("#2E7D32");
+  } else if (status === "已取貨") {
+    cell.setBackground(COLORS.greenBg).setFontColor(COLORS.greenText);
+  } else if (status === "已取消") {
+    cell.setBackground(COLORS.redBg).setFontColor(COLORS.redText);
+  }
+}
+
+// ── 狀態樣式：會員狀態 ──────────────────────────────
+function applyMemberStatusStyle(sheet, row, col, status) {
+  const cell = sheet.getRange(row, col);
+  cell.setHorizontalAlignment("center").setFontWeight("bold");
+  if (status === "active") {
+    cell.setBackground(COLORS.greenBg).setFontColor(COLORS.greenText);
+  } else if (status === "inactive") {
+    cell.setBackground(COLORS.yellowBg).setFontColor(COLORS.yellowText);
+  } else if (status === "blocked") {
+    cell.setBackground(COLORS.redBg).setFontColor(COLORS.redText);
+  }
+}
+
+// ── 新資料列自動格式化（appendRow 後呼叫）────────────
+function styleNewRow(sheet, sheetName) {
+  const rowNum = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  formatDataRow(sheet, sheetName, rowNum, lastCol);
 }
